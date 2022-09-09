@@ -23,6 +23,7 @@ pub async fn run() {
     }
     log::info!("Running...");
 
+    // Create window with event loop.
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
 
@@ -44,6 +45,7 @@ pub async fn run() {
             .expect("Couldn't append canvas to document body.");
     }
 
+    // Create display to render view.
     let mut view = view::View::new(&window).await;
 
     log::info!("Start event loop");

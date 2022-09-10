@@ -1,10 +1,15 @@
 use wgpu::include_wgsl;
 use winit::{dpi::PhysicalSize, window::Window};
 
-use crate::rotation::RotationY;
+use crate::{camera::Camera, rotation::RotationY};
 
+#[derive(Default)]
 pub struct Keys {
     pub rotation: bool,
+    pub forward: bool,
+    pub backward: bool,
+    pub left: bool,
+    pub right: bool,
 }
 
 pub struct View {
@@ -63,7 +68,7 @@ impl View {
 
         let triangle_render_pass = TriangleRenderPass::new(&device, &config);
 
-        let keys = Keys { rotation: false };
+        let keys = Keys::default();
 
         View {
             size,
@@ -90,7 +95,8 @@ impl View {
     }
 
     pub fn update(&mut self, dt: instant::Duration) {
-        self.triangle_render_pass.update(&self.queue, dt, &self.keys);
+        self.triangle_render_pass
+            .update(&self.queue, dt, &self.keys);
     }
 
     pub fn render(&self) -> Result<(), wgpu::SurfaceError> {
@@ -114,15 +120,18 @@ impl View {
 struct TriangleRenderPass {
     pipeline: wgpu::RenderPipeline,
     rotation: RotationY,
+    camera: Camera,
 }
 
 impl TriangleRenderPass {
     fn new(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) -> Self {
         let shader = device.create_shader_module(include_wgsl!("shader.wgsl"));
         let rotation = RotationY::new(device);
+        let camera = Camera::new(device, config.width as f32 / config.height as f32);
+
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
-            bind_group_layouts: &[&rotation.bind_group_layout],
+            bind_group_layouts: &[&rotation.bind_group_layout, &camera.bind_group_layout],
             push_constant_ranges: &[],
         });
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -163,13 +172,18 @@ impl TriangleRenderPass {
             multiview: None,
         });
 
-        TriangleRenderPass { pipeline, rotation }
+        TriangleRenderPass {
+            pipeline,
+            rotation,
+            camera,
+        }
     }
 
     pub fn update(&mut self, queue: &wgpu::Queue, _dt: instant::Duration, keys: &Keys) {
         if keys.rotation {
             self.rotation.increment_angle(queue, cgmath::Rad(0.01));
         }
+        self.camera.update(queue, keys);
     }
 
     fn render(&self, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) {
@@ -187,6 +201,7 @@ impl TriangleRenderPass {
         });
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.rotation.bind_group, &[]);
+        render_pass.set_bind_group(1, &self.camera.bind_group, &[]);
         render_pass.draw(0..10, 0..1);
     }
 }

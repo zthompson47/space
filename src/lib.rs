@@ -1,3 +1,4 @@
+mod camera;
 mod input;
 mod rotation;
 mod view;

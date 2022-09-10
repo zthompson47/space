@@ -1,3 +1,4 @@
+mod rotation;
 mod view;
 
 use winit::{
@@ -47,6 +48,7 @@ pub async fn run() {
 
     // Create display to render view.
     let mut view = view::View::new(&window).await;
+    let mut last_render_time = instant::Instant::now();
 
     log::info!("Start event loop");
     event_loop.run(move |event, _, control_flow| {
@@ -81,9 +83,12 @@ pub async fn run() {
             }
 
             Event::RedrawRequested(window_id) if window_id == window.id() => {
-                //let dt = now - last_render_time;
-                //last_render_time = now;
-                //state.update(dt);
+                let now = instant::Instant::now();
+                let dt = now - last_render_time;
+                last_render_time = now;
+
+                view.update(dt);
+
                 match view.render() {
                     Ok(_) => {}
                     // Reconfigure the surface if lost

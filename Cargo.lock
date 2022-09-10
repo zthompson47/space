@@ -1705,6 +1705,7 @@ dependencies = [
  "env_logger",
  "fs_extra",
  "image",
+ "instant",
  "log",
  "png",
  "pollster",

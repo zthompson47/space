@@ -16,6 +16,7 @@ pollster = "0.2.5"
 wgpu = "0.13"
 winit = "0.27.2"
 log = "0.4.17"
+instant = "0.1.12"
 
 [dependencies.image]
 version = "0.24.3"

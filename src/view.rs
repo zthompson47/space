@@ -3,6 +3,10 @@ use winit::{dpi::PhysicalSize, window::Window};
 
 use crate::rotation::RotationY;
 
+pub struct Keys {
+    pub rotation: bool,
+}
+
 pub struct View {
     size: PhysicalSize<u32>,
     surface: wgpu::Surface,
@@ -10,6 +14,7 @@ pub struct View {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     triangle_render_pass: TriangleRenderPass,
+    pub keys: Keys,
 }
 
 impl View {
@@ -58,6 +63,8 @@ impl View {
 
         let triangle_render_pass = TriangleRenderPass::new(&device, &config);
 
+        let keys = Keys { rotation: false };
+
         View {
             size,
             surface,
@@ -65,6 +72,7 @@ impl View {
             queue,
             config,
             triangle_render_pass,
+            keys,
         }
     }
 
@@ -82,7 +90,7 @@ impl View {
     }
 
     pub fn update(&mut self, dt: instant::Duration) {
-        self.triangle_render_pass.update(&self.queue, dt);
+        self.triangle_render_pass.update(&self.queue, dt, &self.keys);
     }
 
     pub fn render(&self) -> Result<(), wgpu::SurfaceError> {
@@ -158,8 +166,10 @@ impl TriangleRenderPass {
         TriangleRenderPass { pipeline, rotation }
     }
 
-    pub fn update(&mut self, queue: &wgpu::Queue, _dt: instant::Duration) {
-        self.rotation.increment_angle(queue, cgmath::Rad(0.01));
+    pub fn update(&mut self, queue: &wgpu::Queue, _dt: instant::Duration, keys: &Keys) {
+        if keys.rotation {
+            self.rotation.increment_angle(queue, cgmath::Rad(0.01));
+        }
     }
 
     fn render(&self, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) {

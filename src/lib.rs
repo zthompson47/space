@@ -1,3 +1,4 @@
+mod input;
 mod rotation;
 mod view;
 
@@ -58,7 +59,7 @@ pub async fn run() {
                 ref event,
                 window_id,
             } if window_id == window.id() => {
-                if !input(event) {
+                if !input::process_event(&mut view, event) {
                     match event {
                         #[cfg(not(target_arch = "wasm32"))]
                         WindowEvent::CloseRequested
@@ -122,9 +123,4 @@ pub async fn run() {
             _ => {}
         }
     });
-}
-
-fn input(event: &WindowEvent) -> bool {
-    let _ = event;
-    false
 }

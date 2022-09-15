@@ -10,13 +10,14 @@ struct Rotation {
 var<uniform> rotation: Rotation;
 
 struct Camera {
+    view_position: vec4<f32>,
     view_proj: mat4x4<f32>,
 };
 @group(1) @binding(0)
 var<uniform> camera: Camera;
 
 @vertex
-fn vs_main(
+fn vs_pyramid(
     @builtin(vertex_index) in_vertex_index: u32,
 ) -> VertexOutput {
     var vertices = array<vec3<f32>, 9>(
@@ -50,7 +51,55 @@ fn vs_main(
     let v = vertices[in_vertex_index];
 
     var out: VertexOutput;
-    out.clip_position = camera.view_proj * rotation.transform * vec4<f32>(v, 1.0);
+    out.clip_position = camera.view_proj * rotation.transform * vec4<f32>(v, 1.0) + vec4<f32>(4.0, 0.0, 0.0, 0.0);
+    out.color = colors[in_vertex_index];
+    return out;
+}
+
+@vertex
+fn vs_pyramid4(
+    @builtin(vertex_index) in_vertex_index: u32,
+) -> VertexOutput {
+    var vertices = array<vec3<f32>, 12>(
+        vec3<f32>(0.0, 0.5, 0.0),
+        vec3<f32>(-0.5, -0.5, 0.5),
+        vec3<f32>(0.5, -0.5, 0.5),
+
+        vec3<f32>(0.0, 0.5, 0.0),
+        vec3<f32>(0.5, -0.5, 0.5),
+        vec3<f32>(0.5, -0.5, -0.5),
+
+        vec3<f32>(0.0, 0.5, 0.0),
+        vec3<f32>(0.5, -0.5, -0.5),
+        vec3<f32>(-0.5, -0.5, -0.5),
+
+        vec3<f32>(0.0, 0.5, 0.0),
+        vec3<f32>(-0.5, -0.5, -0.5),
+        vec3<f32>(-0.5, -0.5, 0.5),
+    );
+
+    var colors = array<vec4<f32>, 12>(
+        vec4<f32>(1.0, 0.0, 0.0, 1.0),
+        vec4<f32>(1.0, 1.0, 1.0, 1.0),
+        vec4<f32>(1.0, 1.0, 1.0, 1.0),
+
+        vec4<f32>(0.0, 1.0, 0.0, 1.0),
+        vec4<f32>(1.0, 1.0, 1.0, 1.0),
+        vec4<f32>(1.0, 1.0, 1.0, 1.0),
+
+        vec4<f32>(0.0, 0.0, 1.0, 1.0),
+        vec4<f32>(1.0, 1.0, 1.0, 1.0),
+        vec4<f32>(1.0, 1.0, 1.0, 1.0),
+
+        vec4<f32>(0.5, 0.5, 0.5, 1.0),
+        vec4<f32>(1.0, 1.0, 1.0, 1.0),
+        vec4<f32>(1.0, 1.0, 1.0, 1.0),
+    );
+
+    let v = vertices[in_vertex_index];
+
+    var out: VertexOutput;
+    out.clip_position = camera.view_proj * rotation.transform * vec4<f32>(v, 1.0) + vec4<f32>(-4.0, 0.0, 0.0, 0.0);
     out.color = colors[in_vertex_index];
     return out;
 }

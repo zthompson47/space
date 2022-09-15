@@ -1,4 +1,5 @@
 mod camera;
+mod draw_shape;
 mod input;
 mod rotation;
 mod view;
@@ -49,38 +50,45 @@ pub async fn run() {
     }
 
     // Create display to render view.
-    let mut view = view::View::new(&window).await;
+    let mut view = view::RenderView::new(&window).await;
     let mut last_render_time = instant::Instant::now();
 
     log::info!("Start event loop");
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
         match event {
+            Event::DeviceEvent {
+                event: DeviceEvent::MouseMotion { delta },
+                ..
+            } => {
+                if view.keys.mouse_pressed {
+                    view.camera_controller.process_mouse(delta.0, delta.1);
+                }
+            }
+
             Event::WindowEvent {
                 ref event,
                 window_id,
-            } if window_id == window.id() => {
-                if !input::process_event(&mut view, event) {
-                    match event {
-                        #[cfg(not(target_arch = "wasm32"))]
-                        WindowEvent::CloseRequested
-                        | WindowEvent::KeyboardInput {
-                            input:
-                                KeyboardInput {
-                                    state: ElementState::Pressed,
-                                    virtual_keycode: Some(VirtualKeyCode::Escape),
-                                    ..
-                                },
-                            ..
-                        } => *control_flow = ControlFlow::Exit,
-                        WindowEvent::Resized(physical_size) => {
-                            view.resize(*physical_size);
-                        }
-                        WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                            view.resize(**new_inner_size);
-                        }
-                        _ => {}
+            } if window_id == window.id() && !input::process_event(&mut view, event) => {
+                match event {
+                    #[cfg(not(target_arch = "wasm32"))]
+                    WindowEvent::CloseRequested
+                    | WindowEvent::KeyboardInput {
+                        input:
+                            KeyboardInput {
+                                state: ElementState::Pressed,
+                                virtual_keycode: Some(VirtualKeyCode::Escape),
+                                ..
+                            },
+                        ..
+                    } => *control_flow = ControlFlow::Exit,
+                    WindowEvent::Resized(physical_size) => {
+                        view.resize(*physical_size);
                     }
+                    WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
+                        view.resize(**new_inner_size);
+                    }
+                    _ => {}
                 }
             }
 
@@ -88,7 +96,6 @@ pub async fn run() {
                 let now = instant::Instant::now();
                 let dt = now - last_render_time;
                 last_render_time = now;
-
                 view.update(dt);
 
                 match view.render() {
@@ -106,19 +113,6 @@ pub async fn run() {
                 // RedrawRequested will only trigger once, unless we manually
                 // request it.
                 window.request_redraw();
-            }
-
-            Event::DeviceEvent {
-                event: DeviceEvent::MouseMotion { delta },
-                ..
-            } => {
-                let _ = delta;
-                /*if state.camera_bundle.mouse_pressed {
-                    state
-                        .camera_bundle
-                        .controller
-                        .process_mouse(delta.0, delta.1)
-                }*/
             }
 
             _ => {}

@@ -1,6 +1,8 @@
-use winit::event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent};
+use winit::event::{ElementState, KeyboardInput, MouseButton, VirtualKeyCode, WindowEvent};
 
-pub fn process_event(view: &mut crate::view::View, event: &winit::event::WindowEvent) -> bool {
+use crate::view::RenderView;
+
+pub fn process_event(view: &mut RenderView, event: &WindowEvent) -> bool {
     match event {
         WindowEvent::KeyboardInput {
             input:
@@ -14,30 +16,29 @@ pub fn process_event(view: &mut crate::view::View, event: &winit::event::WindowE
             let is_pressed = *state == ElementState::Pressed;
             match key {
                 VirtualKeyCode::R => {
+                    log::info!("R pressed {is_pressed}");
                     if is_pressed {
                         view.keys.rotation = !view.keys.rotation;
                     }
-                    true
                 }
-                VirtualKeyCode::W | VirtualKeyCode::Up => {
-                    view.keys.forward = is_pressed;
-                    true
-                }
-                VirtualKeyCode::A | VirtualKeyCode::Left => {
-                    view.keys.left = is_pressed;
-                    true
-                }
-                VirtualKeyCode::S | VirtualKeyCode::Down => {
-                    view.keys.backward = is_pressed;
-                    true
-                }
-                VirtualKeyCode::D | VirtualKeyCode::Right => {
-                    view.keys.right = is_pressed;
-                    true
-                }
-                _ => false,
+                _ => return view.camera_controller.process_keyboard(*key, *state),
             }
         }
-        _ => false,
+
+        WindowEvent::MouseWheel { delta, .. } => {
+            view.camera_controller.process_scroll(delta);
+        }
+
+        WindowEvent::MouseInput {
+            button: MouseButton::Left,
+            state,
+            ..
+        } => {
+            view.mouse_pressed = *state == ElementState::Pressed;
+        }
+
+        _ => return false,
     }
+
+    true
 }

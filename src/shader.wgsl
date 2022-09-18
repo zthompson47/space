@@ -12,9 +12,44 @@ var<uniform> rotation: Rotation;
 struct Camera {
     view_position: vec4<f32>,
     view_proj: mat4x4<f32>,
+    proj: mat4x4<f32>,
+    proj_inv: mat4x4<f32>,
+    view: mat4x4<f32>,
 };
 @group(1) @binding(0)
 var<uniform> camera: Camera;
+
+@vertex
+fn vs_background(
+    @builtin(vertex_index) in_vertex_index: u32,
+) -> VertexOutput {
+    var vertices = array<vec3<f32>, 6>(
+        vec3<f32>(-10.0, 10.0, -10.0),
+        vec3<f32>(-10.0, -10.0, -10.0),
+        vec3<f32>(10.0, 10.0, -10.0),
+
+        vec3<f32>(10.0, 10.0, -10.0),
+        vec3<f32>(-10.0, -10.0, -10.0),
+        vec3<f32>(10.0, -10.0, -10.0),
+    );
+
+    var colors = array<vec4<f32>, 6>(
+        vec4<f32>(1.0, 1.0, 0.0, 1.0),
+        vec4<f32>(0.0, 1.0, 1.0, 1.0),
+        vec4<f32>(1.0, 0.0, 1.0, 1.0),
+
+        vec4<f32>(1.0, 0.0, 1.0, 1.0),
+        vec4<f32>(0.0, 1.0, 1.0, 1.0),
+        vec4<f32>(0.5, 0.5, 0.5, 1.0),
+    );
+
+    let v = vertices[in_vertex_index];
+
+    var out: VertexOutput;
+    out.clip_position = camera.view_proj * vec4<f32>(v, 1.0) + vec4<f32>(4.0, 0.0, 0.0, 0.0);
+    out.color = colors[in_vertex_index];
+    return out;
+}
 
 @vertex
 fn vs_pyramid(
@@ -104,7 +139,44 @@ fn vs_pyramid4(
     return out;
 }
 
+struct SkyOutput {
+    @builtin(position) position: vec4<f32>,
+    @location(0) uv: vec3<f32>,
+};
+
+@vertex
+fn vs_sky(@builtin(vertex_index) vertex_index: u32) -> SkyOutput {
+    // hacky way to draw a large triangle
+    let tmp1 = i32(vertex_index) / 2;
+    let tmp2 = i32(vertex_index) & 1;
+    let pos = vec4<f32>(
+        f32(tmp1) * 4.0 - 1.0,
+        f32(tmp2) * 4.0 - 1.0,
+        1.0,
+        1.0
+    );
+
+    // transposition = inversion for this orthonormal matrix
+    let inv_model_view = transpose(mat3x3<f32>(camera.view.x.xyz, camera.view.y.xyz, camera.view.z.xyz));
+    let unprojected = camera.proj_inv * pos;
+
+    var result: SkyOutput;
+    result.uv = inv_model_view * unprojected.xyz;
+    result.position = pos;
+    return result;
+}
+
+@group(2) @binding(0)
+var r_texture: texture_cube<f32>;
+@group(2) @binding(1)
+var r_sampler: sampler;
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     return in.color;
+}
+
+@fragment
+fn fs_sky(vertex: SkyOutput) -> @location(0) vec4<f32> {
+    return textureSample(r_texture, r_sampler, vertex.uv);
 }

@@ -1,38 +1,36 @@
+use std::collections::VecDeque;
+
 use winit::{dpi::PhysicalSize, window::Window};
 
 use crate::{
     camera::{Camera, CameraController, Projection},
     draw_shape::{DrawShape, DrawShapeRenderPass},
+    rotation::RotationY,
+    skybox::Skybox,
 };
 
 #[derive(Default)]
 pub struct Keys {
     pub rotation: bool,
-    pub forward: bool,
-    pub backward: bool,
-    pub left: bool,
-    pub right: bool,
-    pub up: bool,
-    pub down: bool,
-    pub mouse_pressed: bool,
-    pub rotate_horizontal: f32,
-    pub rotate_vertical: f32,
-    pub scroll: f32,
 }
 
 pub struct RenderView {
-    size: PhysicalSize<u32>,
+    size: winit::dpi::PhysicalSize<u32>,
     surface: wgpu::Surface,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     camera: Camera,
+    shader: wgpu::ShaderModule,
+    pipeline_layout: wgpu::PipelineLayout,
+    rotation: RotationY,
     pub camera_controller: CameraController,
     projection: Projection,
     pub mouse_pressed: bool,
-    pyramid3_render_pass: DrawShapeRenderPass,
-    pyramid4_render_pass: DrawShapeRenderPass,
+    draw_shapes: VecDeque<DrawShapeRenderPass>,
     pub keys: Keys,
+    skybox: Skybox,
+    skybox_pipeline: wgpu::RenderPipeline,
 }
 
 impl RenderView {
@@ -76,8 +74,9 @@ impl RenderView {
             height: size.height,
             present_mode: wgpu::PresentMode::Fifo,
         };
-
         surface.configure(&device, &config);
+        let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
+        let rotation = RotationY::new(&device);
 
         let keys = Keys::default();
 
@@ -92,19 +91,46 @@ impl RenderView {
         );
         camera.update_view_proj(&projection);
 
-        // Shapes.
-        let pyramid = DrawShape {
-            vertex_fn: "vs_pyramid",
-            vertex_count: 9,
-        };
-        let triangle_render_pass =
-            DrawShapeRenderPass::new(&device, &config, pyramid, &camera.bind_group_layout);
-        let pyramid4 = DrawShape {
-            vertex_fn: "vs_pyramid4",
-            vertex_count: 12,
-        };
-        let shape_render_pass =
-            DrawShapeRenderPass::new(&device, &config, pyramid4, &camera.bind_group_layout);
+        let skybox = Skybox::new(&device, &queue);
+
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: None,
+            bind_group_layouts: &[
+                &rotation.bind_group_layout,
+                &camera.bind_group_layout,
+                &skybox.bind_group_layout,
+            ],
+            push_constant_ranges: &[],
+        });
+
+        let skybox_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Sky"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: "vs_sky",
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: "fs_sky",
+                targets: &[Some(config.format.into())],
+            }),
+            primitive: wgpu::PrimitiveState {
+                front_face: wgpu::FrontFace::Cw,
+                ..Default::default()
+            },
+            /*depth_stencil: Some(wgpu::DepthStencilState {
+                format: wgpu::TextureFormat::Depth24Plus,
+                depth_write_enabled: false,
+                depth_compare: wgpu::CompareFunction::LessEqual,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),*/
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+        });
 
         RenderView {
             size,
@@ -112,14 +138,28 @@ impl RenderView {
             device,
             queue,
             config,
-            pyramid3_render_pass: triangle_render_pass,
             keys,
-            pyramid4_render_pass: shape_render_pass,
             camera,
             camera_controller,
             projection,
             mouse_pressed: false,
+            draw_shapes: VecDeque::new(),
+            shader,
+            pipeline_layout,
+            rotation,
+            skybox,
+            skybox_pipeline,
         }
+    }
+
+    pub fn push_shape(&mut self, shape: DrawShape) {
+        self.draw_shapes.push_back(DrawShapeRenderPass::new(
+            &self.device,
+            &self.config,
+            shape,
+            &self.shader,
+            &self.pipeline_layout,
+        ));
     }
 
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
@@ -137,10 +177,12 @@ impl RenderView {
     }
 
     pub fn update(&mut self, dt: instant::Duration) {
-        self.pyramid3_render_pass
-            .update(&self.queue, dt, &mut self.keys);
-        self.pyramid4_render_pass
-            .update(&self.queue, dt, &mut self.keys);
+        let step = dt.as_secs_f32();
+
+        if self.keys.rotation {
+            self.rotation
+                .increment_angle(&self.queue, cgmath::Rad(step));
+        }
 
         self.camera_controller.update_camera(&mut self.camera, dt);
         self.camera.update_view_proj(&self.projection);
@@ -152,7 +194,7 @@ impl RenderView {
         );
     }
 
-    pub fn render(&self) -> Result<(), wgpu::SurfaceError> {
+    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture
@@ -161,10 +203,32 @@ impl RenderView {
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
-        self.pyramid3_render_pass
-            .render(&mut encoder, &view, &self.camera.bind_group);
-        self.pyramid4_render_pass
-            .render(&mut encoder, &view, &self.camera.bind_group);
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: None,
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::default()),
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: None,
+            });
+
+            render_pass.set_bind_group(0, &self.rotation.bind_group, &[]);
+            render_pass.set_bind_group(1, &self.camera.bind_group, &[]);
+            render_pass.set_bind_group(2, &self.skybox.bind_group, &[]);
+
+            render_pass.set_pipeline(&self.skybox_pipeline);
+            render_pass.draw(0..3, 0..1);
+
+            for shape in self.draw_shapes.iter_mut() {
+                render_pass.set_pipeline(&shape.pipeline);
+                render_pass.draw(0..shape.shape.vertex_count, 0..1);
+            }
+        }
 
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();

@@ -19,6 +19,9 @@ const SAFE_FRAC_PI_2: f32 = std::f32::consts::FRAC_PI_2 - 0.0001;
 pub struct CameraUniform {
     view_position: [f32; 4],
     view_proj: [[f32; 4]; 4],
+    proj: [[f32; 4]; 4],
+    proj_inv: [[f32; 4]; 4],
+    view: [[f32; 4]; 4],
 }
 
 impl CameraUniform {
@@ -26,6 +29,9 @@ impl CameraUniform {
         CameraUniform {
             view_position: [0.0; 4],
             view_proj: cgmath::Matrix4::identity().into(),
+            proj: cgmath::Matrix4::identity().into(),
+            proj_inv: cgmath::Matrix4::identity().into(),
+            view: cgmath::Matrix4::identity().into(),
         }
     }
 }
@@ -182,24 +188,27 @@ impl Camera {
         pitch: P,
     ) -> Self {
         let uniform = CameraUniform::new();
+
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             contents: bytemuck::cast_slice(&[uniform]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
+
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
                     min_binding_size: None,
                 },
+                visibility: wgpu::ShaderStages::VERTEX,
                 count: None,
             }],
         });
+
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &bind_group_layout,
@@ -231,6 +240,10 @@ impl Camera {
 
     pub fn update_view_proj(&mut self, projection: &Projection) {
         self.uniform.view_position = self.position.to_homogeneous().into();
+        self.uniform.view = self.calc_matrix().into();
+        self.uniform.proj = projection.calc_matrix().into();
+        use cgmath::Transform;
+        self.uniform.proj_inv = projection.calc_matrix().inverse_transform().unwrap().into();
         self.uniform.view_proj = (projection.calc_matrix() * self.calc_matrix()).into();
     }
 }

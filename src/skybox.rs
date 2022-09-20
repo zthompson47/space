@@ -27,13 +27,6 @@ impl Skybox {
             height: 200,
             depth_or_array_layers: 6,
         };
-        /*
-        let layer_size = wgpu::Extent3d {
-            depth_or_array_layers: 1,
-            ..size
-        };
-        let max_mips = layer_size.max_mips(wgpu::TextureDimension::D2);
-        */
 
         fn pack_skybox(accum: &mut Vec<u8>, image_bytes: &[u8]) {
             let decoded = image::load_from_memory(image_bytes).unwrap().into_rgba8();

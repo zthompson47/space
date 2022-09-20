@@ -10,6 +10,7 @@ mod draw_shape;
 mod input;
 mod rotation;
 mod skybox;
+mod texture;
 mod view;
 
 #[cfg(target_arch = "wasm32")]
@@ -55,15 +56,18 @@ pub async fn run() {
     let mut view = view::RenderView::new(&window).await;
     view.push_shape(DrawShape {
         vertex_fn: "vs_background",
+        fragment_fn: "fs_texture",
         vertex_count: 6,
     });
     view.push_shape(DrawShape {
-        vertex_fn: "vs_pyramid",
-        vertex_count: 9,
+        vertex_fn: "vs_pyramid4",
+        fragment_fn: "fs_main",
+        vertex_count: 12,
     });
     view.push_shape(DrawShape {
-        vertex_fn: "vs_pyramid4",
-        vertex_count: 12,
+        vertex_fn: "vs_pyramid",
+        fragment_fn: "fs_main",
+        vertex_count: 9,
     });
 
     let mut last_render_time = instant::Instant::now();

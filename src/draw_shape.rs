@@ -1,14 +1,17 @@
+#[derive(Debug)]
 pub struct DrawShape {
     pub vertex_fn: &'static str,
+    pub fragment_fn: &'static str,
     pub vertex_count: u32,
 }
 
-pub struct DrawShapeRenderPass {
+#[derive(Debug)]
+pub struct DrawShapePipeline {
     pub pipeline: wgpu::RenderPipeline,
     pub shape: DrawShape,
 }
 
-impl DrawShapeRenderPass {
+impl DrawShapePipeline {
     pub fn new(
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
@@ -44,16 +47,22 @@ impl DrawShapeRenderPass {
             },
             fragment: Some(wgpu::FragmentState {
                 module: shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
+                //entry_point: "fs_main",
+                entry_point: shape.fragment_fn,
+                /*targets: &[Some(wgpu::ColorTargetState {
                     format: config.format,
                     blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],*/
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
             }),
             multiview: None,
         });
 
-        DrawShapeRenderPass { pipeline, shape }
+        DrawShapePipeline { pipeline, shape }
     }
 }

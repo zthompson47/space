@@ -4,9 +4,10 @@ use winit::{dpi::PhysicalSize, window::Window};
 
 use crate::{
     camera::{Camera, CameraController, Projection},
-    draw_shape::{DrawShape, DrawShapeRenderPass},
+    draw_shape::{DrawShape, DrawShapePipeline},
     rotation::RotationY,
     skybox::Skybox,
+    texture::Texture,
 };
 
 #[derive(Default)]
@@ -16,6 +17,8 @@ pub struct Keys {
 
 pub struct RenderView {
     size: winit::dpi::PhysicalSize<u32>,
+    #[allow(unused)]
+    scale_factor: f32,
     surface: wgpu::Surface,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -27,15 +30,19 @@ pub struct RenderView {
     pub camera_controller: CameraController,
     projection: Projection,
     pub mouse_pressed: bool,
-    draw_shapes: VecDeque<DrawShapeRenderPass>,
+    draw_shapes: VecDeque<DrawShapePipeline>,
     pub keys: Keys,
     skybox: Skybox,
     skybox_pipeline: wgpu::RenderPipeline,
+    egui_context: egui::Context,
+    egui_renderer: egui_wgpu::Renderer,
+    texture: Texture,
 }
 
 impl RenderView {
     pub async fn new(window: &Window) -> Self {
         let size = window.inner_size();
+        let scale_factor = window.scale_factor() as f32;
         let instance = wgpu::Instance::new(wgpu::Backends::all());
 
         // SAFETY: `View` is created in the main thread and `window` remains valid
@@ -93,12 +100,16 @@ impl RenderView {
 
         let skybox = Skybox::new(&device, &queue);
 
+        let filename = format!("{}/res/baba.png", env!("OUT_DIR"));
+        let texture = Texture::from_image_file(&device, &queue, &filename, None, false).unwrap();
+
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
             bind_group_layouts: &[
                 &rotation.bind_group_layout,
                 &camera.bind_group_layout,
                 &skybox.bind_group_layout,
+                &texture.bind_group_layout,
             ],
             push_constant_ranges: &[],
         });
@@ -114,23 +125,24 @@ impl RenderView {
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
                 entry_point: "fs_sky",
-                targets: &[Some(config.format.into())],
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                //targets: &[Some(config.format.into())],
             }),
             primitive: wgpu::PrimitiveState {
                 front_face: wgpu::FrontFace::Cw,
                 ..Default::default()
             },
-            /*depth_stencil: Some(wgpu::DepthStencilState {
-                format: wgpu::TextureFormat::Depth24Plus,
-                depth_write_enabled: false,
-                depth_compare: wgpu::CompareFunction::LessEqual,
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),*/
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
         });
+
+        let egui_context = egui::Context::default();
+        let egui_renderer = egui_wgpu::Renderer::new(&device, config.format, 1, 0);
 
         RenderView {
             size,
@@ -149,11 +161,15 @@ impl RenderView {
             rotation,
             skybox,
             skybox_pipeline,
+            egui_context,
+            egui_renderer,
+            texture,
+            scale_factor,
         }
     }
 
     pub fn push_shape(&mut self, shape: DrawShape) {
-        self.draw_shapes.push_back(DrawShapeRenderPass::new(
+        self.draw_shapes.push_back(DrawShapePipeline::new(
             &self.device,
             &self.config,
             shape,
@@ -183,10 +199,8 @@ impl RenderView {
             self.rotation
                 .increment_angle(&self.queue, cgmath::Rad(step));
         }
-
         self.camera_controller.update_camera(&mut self.camera, dt);
         self.camera.update_view_proj(&self.projection);
-
         self.queue.write_buffer(
             &self.camera.buffer,
             0,
@@ -199,6 +213,7 @@ impl RenderView {
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
+
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
@@ -216,20 +231,89 @@ impl RenderView {
                 })],
                 depth_stencil_attachment: None,
             });
-
             render_pass.set_bind_group(0, &self.rotation.bind_group, &[]);
             render_pass.set_bind_group(1, &self.camera.bind_group, &[]);
             render_pass.set_bind_group(2, &self.skybox.bind_group, &[]);
-
+            render_pass.set_bind_group(3, &self.texture.bind_group, &[]);
             render_pass.set_pipeline(&self.skybox_pipeline);
             render_pass.draw(0..3, 0..1);
-
-            for shape in self.draw_shapes.iter_mut() {
-                render_pass.set_pipeline(&shape.pipeline);
-                render_pass.draw(0..shape.shape.vertex_count, 0..1);
-            }
         }
 
+        for shape in self.draw_shapes.iter_mut() {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: None,
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load, // Clear(wgpu::Color::default()),
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: None,
+            });
+            render_pass.set_bind_group(0, &self.rotation.bind_group, &[]);
+            render_pass.set_bind_group(1, &self.camera.bind_group, &[]);
+            render_pass.set_bind_group(2, &self.skybox.bind_group, &[]);
+            render_pass.set_bind_group(3, &self.texture.bind_group, &[]);
+            render_pass.set_pipeline(&shape.pipeline);
+            render_pass.draw(0..shape.shape.vertex_count, 0..1);
+        }
+
+        // Egui
+        let input = egui::RawInput::default();
+        let full_output = self.egui_context.run(input, |ctx| {
+            egui::Area::new("space_gui")
+                .fixed_pos(egui::pos2(10., 10.))
+                .show(ctx, |ui| {
+                    ui.label("Hello egui!");
+                });
+        });
+        let clipped_primitives: Vec<egui::epaint::ClippedPrimitive> =
+            self.egui_context.tessellate(full_output.shapes);
+
+        for (id, image_delta) in &full_output.textures_delta.set {
+            self.egui_renderer
+                .update_texture(&self.device, &self.queue, *id, image_delta);
+        }
+        for id in &full_output.textures_delta.free {
+            self.egui_renderer.free_texture(id);
+        }
+
+        let screen_descriptor = egui_wgpu::renderer::ScreenDescriptor {
+            size_in_pixels: [self.config.width, self.config.height],
+            pixels_per_point: 2.0, //self.scale_factor,
+        };
+
+        self.egui_renderer.update_buffers(
+            &self.device,
+            &self.queue,
+            clipped_primitives.as_slice(),
+            &screen_descriptor,
+        );
+
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: None,
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load, // Clear(wgpu::Color::default()),
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: None,
+            });
+
+            self.egui_renderer.render_onto_renderpass(
+                &mut render_pass,
+                clipped_primitives.as_slice(),
+                &screen_descriptor,
+            );
+        }
+
+        // Send queue to GPU
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
 

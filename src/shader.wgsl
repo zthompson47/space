@@ -1,6 +1,7 @@
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) color: vec4<f32>,
+    @location(1) tex_coords: vec2<f32>,
 };
 
 struct Rotation {
@@ -34,20 +35,42 @@ fn vs_background(
     );
 
     var colors = array<vec4<f32>, 6>(
-        vec4<f32>(1.0, 1.0, 0.0, 1.0),
-        vec4<f32>(0.0, 1.0, 1.0, 1.0),
-        vec4<f32>(1.0, 0.0, 1.0, 1.0),
+        vec4<f32>(1.0, 1.0, 0.0, 0.75),
+        vec4<f32>(0.0, 1.0, 1.0, 0.75),
+        vec4<f32>(1.0, 0.0, 1.0, 0.75),
 
-        vec4<f32>(1.0, 0.0, 1.0, 1.0),
-        vec4<f32>(0.0, 1.0, 1.0, 1.0),
-        vec4<f32>(0.5, 0.5, 0.5, 1.0),
+        vec4<f32>(1.0, 0.0, 1.0, 0.75),
+        vec4<f32>(0.0, 1.0, 1.0, 0.75),
+        vec4<f32>(0.5, 0.5, 0.5, 0.75),
     );
+
+    var coords = array<vec2<f32>, 6>(
+        vec2<f32>(0.0, 1.0),
+        vec2<f32>(0.0, 0.0),
+        vec2<f32>(1.0, 1.0),
+        vec2<f32>(1.0, 1.0),
+        vec2<f32>(0.0, 0.0),
+        vec2<f32>(0.0, 1.0),
+    );
+    /*
+    var colors = array<vec4<f32>, 6>(
+        vec4<f32>(0.0, 0.0, 0.0, 1.0),
+        vec4<f32>(0.0, 0.0, 0.0, 1.0),
+        vec4<f32>(0.0, 0.0, 0.0, 1.0),
+
+        vec4<f32>(0.0, 0.0, 0.0, 1.0),
+        vec4<f32>(0.0, 0.0, 0.0, 1.0),
+        vec4<f32>(0.0, 0.0, 0.0, 1.0),
+    );
+    */
 
     let v = vertices[in_vertex_index];
 
     var out: VertexOutput;
-    out.clip_position = camera.view_proj * vec4<f32>(v, 1.0) + vec4<f32>(4.0, 0.0, 0.0, 0.0);
+    out.clip_position =
+        camera.view_proj * vec4<f32>(v, 1.0) + vec4<f32>(4.0, 0.0, 0.0, 0.0);
     out.color = colors[in_vertex_index];
+    out.tex_coords = coords[in_vertex_index];
     return out;
 }
 
@@ -71,23 +94,25 @@ fn vs_pyramid(
 
     var colors = array<vec4<f32>, 9>(
         vec4<f32>(1.0, 0.0, 0.0, 1.0),
-        vec4<f32>(1.0, 1.0, 1.0, 1.0),
-        vec4<f32>(1.0, 1.0, 1.0, 1.0),
+        vec4<f32>(1.0, 0.0, 0.0, 0.75),
+        vec4<f32>(1.0, 0.0, 0.0, 0.0),
 
         vec4<f32>(0.0, 1.0, 0.0, 1.0),
-        vec4<f32>(1.0, 1.0, 1.0, 1.0),
-        vec4<f32>(1.0, 1.0, 1.0, 1.0),
+        vec4<f32>(0.0, 1.0, 0.0, 0.75),
+        vec4<f32>(0.0, 1.0, 0.0, 0.0),
 
         vec4<f32>(0.0, 0.0, 1.0, 1.0),
-        vec4<f32>(1.0, 1.0, 1.0, 1.0),
-        vec4<f32>(1.0, 1.0, 1.0, 1.0),
+        vec4<f32>(0.0, 0.0, 1.0, 0.75),
+        vec4<f32>(0.0, 0.0, 1.0, 0.0),
     );
 
     let v = vertices[in_vertex_index];
 
     var out: VertexOutput;
-    out.clip_position = camera.view_proj * rotation.transform * vec4<f32>(v, 1.0) + vec4<f32>(4.0, 0.0, 0.0, 0.0);
+    out.clip_position =
+        camera.view_proj * rotation.transform * vec4<f32>(v, 1.0) + vec4<f32>(4.0, 0.0, 0.0, 0.0);
     out.color = colors[in_vertex_index];
+    out.tex_coords = vec2<f32>(0.0, 0.0);
     return out;
 }
 
@@ -114,28 +139,30 @@ fn vs_pyramid4(
     );
 
     var colors = array<vec4<f32>, 12>(
-        vec4<f32>(1.0, 0.0, 0.0, 1.0),
-        vec4<f32>(1.0, 1.0, 1.0, 1.0),
-        vec4<f32>(1.0, 1.0, 1.0, 1.0),
+        vec4<f32>(1.0, 0.0, 1.0, 1.0),
+        vec4<f32>(0.0, 1.0, 0.0, 1.0),
+        vec4<f32>(1.0, 0.0, 1.0, 1.0),
 
         vec4<f32>(0.0, 1.0, 0.0, 1.0),
-        vec4<f32>(1.0, 1.0, 1.0, 1.0),
-        vec4<f32>(1.0, 1.0, 1.0, 1.0),
+        vec4<f32>(1.0, 0.0, 1.0, 1.0),
+        vec4<f32>(0.0, 1.0, 0.0, 1.0),
 
-        vec4<f32>(0.0, 0.0, 1.0, 1.0),
-        vec4<f32>(1.0, 1.0, 1.0, 1.0),
-        vec4<f32>(1.0, 1.0, 1.0, 1.0),
-
+        vec4<f32>(0.0, 0.0, 0.0, 1.0),
         vec4<f32>(0.5, 0.5, 0.5, 1.0),
         vec4<f32>(1.0, 1.0, 1.0, 1.0),
+
         vec4<f32>(1.0, 1.0, 1.0, 1.0),
+        vec4<f32>(0.5, 0.5, 0.5, 1.0),
+        vec4<f32>(0.0, 0.0, 0.0, 1.0),
     );
 
     let v = vertices[in_vertex_index];
 
     var out: VertexOutput;
-    out.clip_position = camera.view_proj * rotation.transform * vec4<f32>(v, 1.0) + vec4<f32>(-4.0, 0.0, 0.0, 0.0);
+    out.clip_position =
+        camera.view_proj * rotation.transform * vec4<f32>(v, 1.0) + vec4<f32>(-4.0, 0.0, 0.0, 0.0);
     out.color = colors[in_vertex_index];
+    out.tex_coords = vec2<f32>(0.0, 0.0);
     return out;
 }
 
@@ -171,9 +198,19 @@ var r_texture: texture_cube<f32>;
 @group(2) @binding(1)
 var r_sampler: sampler;
 
+@group(3) @binding(0)
+var t_diffuse: texture_2d<f32>;
+@group(3) @binding(1)
+var s_diffuse: sampler;
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     return in.color;
+}
+
+@fragment
+fn fs_texture(in: VertexOutput) -> @location(0) vec4<f32> {
+    return textureSample(t_diffuse, s_diffuse, in.tex_coords);
 }
 
 @fragment

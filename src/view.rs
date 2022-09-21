@@ -214,6 +214,8 @@ impl RenderView {
             0,
             bytemuck::cast_slice(&[self.camera.uniform]),
         );
+
+        self.texture.update(&self.queue, self.gui.slider);
     }
 
     pub fn render(&mut self, egui_input: egui::RawInput) -> Result<(), wgpu::SurfaceError> {
@@ -274,7 +276,7 @@ impl RenderView {
                 //.fixed_pos(egui::pos2(10., 10.))
                 .show(ctx, |ui| {
                     ui.label("Hello egui!");
-                    ui.add(egui::Slider::new(&mut self.gui.slider, 0.0..=30.0).text("Slider"));
+                    ui.add(egui::Slider::new(&mut self.gui.slider, 0.0..=1.0).text("Slider"));
                 });
         });
 

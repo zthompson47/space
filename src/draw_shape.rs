@@ -47,13 +47,7 @@ impl DrawShapePipeline {
             },
             fragment: Some(wgpu::FragmentState {
                 module: shader,
-                //entry_point: "fs_main",
                 entry_point: shape.fragment_fn,
-                /*targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],*/
                 targets: &[Some(wgpu::ColorTargetState {
                     format: config.format,
                     blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),

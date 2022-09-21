@@ -1,11 +1,19 @@
 use image::GenericImageView;
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct Raw {
+    vec4: [f32; 4],
+}
+
 pub struct Texture {
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
     pub sampler: wgpu::Sampler,
     pub bind_group_layout: wgpu::BindGroupLayout,
     pub bind_group: wgpu::BindGroup,
+    pub raw: Raw,
+    pub buffer: wgpu::Buffer,
 }
 
 impl Texture {
@@ -97,8 +105,27 @@ impl Texture {
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
             label,
+        });
+
+        let raw = Raw { vec4: [0.0, 0.0, 0.0, 1.0] };
+
+        use wgpu::util::DeviceExt;
+        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::cast_slice(&[raw]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -112,6 +139,10 @@ impl Texture {
                     binding: 1,
                     resource: wgpu::BindingResource::Sampler(&sampler),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: buffer.as_entire_binding(),
+                }
             ],
             label,
         });
@@ -122,6 +153,13 @@ impl Texture {
             sampler,
             bind_group_layout,
             bind_group,
+            raw,
+            buffer,
         })
+    }
+
+    pub fn update(&mut self, queue: &wgpu::Queue, alpha: f32) {
+        self.raw = Raw { vec4: [0.0, 0.0, 0.0, alpha] };
+        queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(&[self.raw]));
     }
 }

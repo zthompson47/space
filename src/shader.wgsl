@@ -193,25 +193,32 @@ fn vs_sky(@builtin(vertex_index) vertex_index: u32) -> SkyOutput {
     return result;
 }
 
-@group(2) @binding(0)
-var r_texture: texture_cube<f32>;
-@group(2) @binding(1)
-var r_sampler: sampler;
-
-@group(3) @binding(0)
-var t_diffuse: texture_2d<f32>;
-@group(3) @binding(1)
-var s_diffuse: sampler;
-
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     return in.color;
 }
 
+
+struct Raw {
+    data: vec4<f32>,
+}
+
+@group(3) @binding(0)
+var t_diffuse: texture_2d<f32>;
+@group(3) @binding(1)
+var s_diffuse: sampler;
+@group(3) @binding(2)
+var<uniform> raw: Raw;
+
 @fragment
 fn fs_texture(in: VertexOutput) -> @location(0) vec4<f32> {
-    return textureSample(t_diffuse, s_diffuse, in.tex_coords);
+    return vec4<f32>(textureSample(t_diffuse, s_diffuse, in.tex_coords).xyz, raw.data.w);
 }
+
+@group(2) @binding(0)
+var r_texture: texture_cube<f32>;
+@group(2) @binding(1)
+var r_sampler: sampler;
 
 @fragment
 fn fs_sky(vertex: SkyOutput) -> @location(0) vec4<f32> {

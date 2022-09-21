@@ -16,7 +16,6 @@ pub fn process_event(view: &mut RenderView, event: &WindowEvent) -> bool {
             let is_pressed = *state == ElementState::Pressed;
             match key {
                 VirtualKeyCode::R => {
-                    log::info!("R pressed {is_pressed}");
                     if is_pressed {
                         view.keys.rotation = !view.keys.rotation;
                     }

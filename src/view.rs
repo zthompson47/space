@@ -10,6 +10,10 @@ use crate::{
     texture::Texture,
 };
 
+pub struct GuiState {
+    slider: f32,
+}
+
 #[derive(Default)]
 pub struct Keys {
     pub rotation: bool,
@@ -34,9 +38,11 @@ pub struct RenderView {
     pub keys: Keys,
     skybox: Skybox,
     skybox_pipeline: wgpu::RenderPipeline,
-    egui_context: egui::Context,
+    pub egui_context: egui::Context,
     egui_renderer: egui_wgpu::Renderer,
+    pub egui_repaint: bool,
     texture: Texture,
+    gui: GuiState,
 }
 
 impl RenderView {
@@ -163,8 +169,10 @@ impl RenderView {
             skybox_pipeline,
             egui_context,
             egui_renderer,
+            egui_repaint: false,
             texture,
             scale_factor,
+            gui: GuiState { slider: 1.0 },
         }
     }
 
@@ -208,7 +216,7 @@ impl RenderView {
         );
     }
 
-    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+    pub fn render(&mut self, egui_input: egui::RawInput) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture
@@ -261,14 +269,15 @@ impl RenderView {
         }
 
         // Egui
-        let input = egui::RawInput::default();
-        let full_output = self.egui_context.run(input, |ctx| {
+        let full_output = self.egui_context.run(egui_input, |ctx| {
             egui::Area::new("space_gui")
-                .fixed_pos(egui::pos2(10., 10.))
+                //.fixed_pos(egui::pos2(10., 10.))
                 .show(ctx, |ui| {
                     ui.label("Hello egui!");
+                    ui.add(egui::Slider::new(&mut self.gui.slider, 0.0..=30.0).text("Slider"));
                 });
         });
+
         let clipped_primitives: Vec<egui::epaint::ClippedPrimitive> =
             self.egui_context.tessellate(full_output.shapes);
 
@@ -299,7 +308,7 @@ impl RenderView {
                     view: &view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load, // Clear(wgpu::Color::default()),
+                        load: wgpu::LoadOp::Load,
                         store: true,
                     },
                 })],

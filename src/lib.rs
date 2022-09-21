@@ -69,12 +69,14 @@ pub async fn run() {
         fragment_fn: "fs_main",
         vertex_count: 9,
     });
+    let mut egui_state = egui_winit::State::new(&event_loop);
 
     let mut last_render_time = instant::Instant::now();
 
     log::info!("Start event loop");
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
+
         match event {
             Event::DeviceEvent {
                 event: DeviceEvent::MouseMotion { delta },
@@ -88,27 +90,34 @@ pub async fn run() {
             Event::WindowEvent {
                 ref event,
                 window_id,
-            } if window_id == window.id() && !input::process_event(&mut view, event) => match event
-            {
-                #[cfg(not(target_arch = "wasm32"))]
-                WindowEvent::CloseRequested
-                | WindowEvent::KeyboardInput {
-                    input:
-                        KeyboardInput {
-                            state: ElementState::Pressed,
-                            virtual_keycode: Some(VirtualKeyCode::Escape),
+            } if window_id == window.id() => {
+                let egui_response = egui_state.on_event(&view.egui_context, event);
+                if egui_response.repaint {
+                    view.egui_repaint = true;
+                }
+                if !egui_response.consumed && !input::process_event(&mut view, event) {
+                    match event {
+                        #[cfg(not(target_arch = "wasm32"))]
+                        WindowEvent::CloseRequested
+                        | WindowEvent::KeyboardInput {
+                            input:
+                                KeyboardInput {
+                                    state: ElementState::Pressed,
+                                    virtual_keycode: Some(VirtualKeyCode::Escape),
+                                    ..
+                                },
                             ..
-                        },
-                    ..
-                } => *control_flow = ControlFlow::Exit,
-                WindowEvent::Resized(physical_size) => {
-                    view.resize(*physical_size);
+                        } => *control_flow = ControlFlow::Exit,
+                        WindowEvent::Resized(physical_size) => {
+                            view.resize(*physical_size);
+                        }
+                        WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
+                            view.resize(**new_inner_size);
+                        }
+                        _ => {}
+                    }
                 }
-                WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                    view.resize(**new_inner_size);
-                }
-                _ => {}
-            },
+            }
 
             Event::RedrawRequested(window_id) if window_id == window.id() => {
                 let now = instant::Instant::now();
@@ -116,7 +125,8 @@ pub async fn run() {
                 last_render_time = now;
                 view.update(dt);
 
-                match view.render() {
+                let egui_input = egui_state.take_egui_input(&window);
+                match view.render(egui_input) {
                     Ok(_) => {}
                     // Reconfigure the surface if lost
                     Err(wgpu::SurfaceError::Lost) => view.recover(),

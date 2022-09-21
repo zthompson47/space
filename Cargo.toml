@@ -20,6 +20,10 @@ instant = "0.1.12"
 #egui = "0.19.0"
 egui = { git = "https://github.com/emilk/egui" }
 egui-wgpu = { git = "https://github.com/emilk/egui" }
+egui-winit = { git = "https://github.com/emilk/egui" }
+#egui = { path = "/home/zach/cratesio/egui/crates/egui" }
+#egui-wgpu = { path = "/home/zach/cratesio/egui/crates/egui-wgpu" }
+#egui-winit = { path = "/home/zach/cratesio/egui/crates/egui-winit" }
 
 [dependencies.image]
 version = "0.24.3"

@@ -1,17 +1,19 @@
-use crate::draw_shape::DrawShape;
+mod camera;
+mod draw_shape;
+mod input;
+mod resources;
+mod rotation;
+mod skybox;
+mod texture;
+mod view;
+
 use winit::{
     event::{DeviceEvent, ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::WindowBuilder,
 };
 
-mod camera;
-mod draw_shape;
-mod input;
-mod rotation;
-mod skybox;
-mod texture;
-mod view;
+use crate::draw_shape::DrawShape;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;

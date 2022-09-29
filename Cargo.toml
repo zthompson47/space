@@ -20,7 +20,12 @@ instant = "0.1.12"
 #egui = "0.19.0"
 egui = { git = "https://github.com/emilk/egui" }
 egui-wgpu = { git = "https://github.com/emilk/egui" }
-egui-winit = { git = "https://github.com/emilk/egui" }
+egui-winit = { git = "https://github.com/emilk/egui", default-features = false }
+getrandom = { version = "0.2.7", features = ["js"] }
+easer = "0.3.0"
+cfg-if = "1.0.0"
+noise = { path = "/home/zach/projects/wgpu/noise" }
+#simdnoise = "3.1.6"
 #egui = { path = "/home/zach/cratesio/egui/crates/egui" }
 #egui-wgpu = { path = "/home/zach/cratesio/egui/crates/egui-wgpu" }
 #egui-winit = { path = "/home/zach/cratesio/egui/crates/egui-winit" }

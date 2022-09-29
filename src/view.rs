@@ -5,6 +5,7 @@ use winit::{dpi::PhysicalSize, window::Window};
 use crate::{
     camera::{Camera, CameraController, Projection},
     draw_shape::{DrawShape, DrawShapePipeline},
+    resources::load_texture,
     rotation::RotationY,
     skybox::Skybox,
     texture::Texture,
@@ -43,6 +44,7 @@ pub struct RenderView {
     pub egui_repaint: bool,
     texture: Texture,
     gui: GuiState,
+    //noise: Vec<f32>,
 }
 
 impl RenderView {
@@ -106,8 +108,7 @@ impl RenderView {
 
         let skybox = Skybox::new(&device, &queue);
 
-        let filename = format!("{}/res/baba.png", env!("OUT_DIR"));
-        let texture = Texture::from_image_file(&device, &queue, &filename, None, false).unwrap();
+        let texture = load_texture("baba.png", &device, &queue).await.unwrap();
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
@@ -150,6 +151,8 @@ impl RenderView {
         let egui_context = egui::Context::default();
         let egui_renderer = egui_wgpu::Renderer::new(&device, config.format, 1, 0);
 
+        //let noise = simdnoise::NoiseBuilder::fbm_1d(256).generate_scaled(0.0, 1.0);
+
         RenderView {
             size,
             surface,
@@ -173,6 +176,7 @@ impl RenderView {
             texture,
             scale_factor,
             gui: GuiState { slider: 1.0 },
+            //noise,
         }
     }
 
@@ -205,7 +209,7 @@ impl RenderView {
 
         if self.keys.rotation {
             self.rotation
-                .increment_angle(&self.queue, cgmath::Rad(step));
+                .increment_angle(&self.queue, step);
         }
         self.camera_controller.update_camera(&mut self.camera, dt);
         self.camera.update_view_proj(&self.projection);
@@ -215,7 +219,9 @@ impl RenderView {
             bytemuck::cast_slice(&[self.camera.uniform]),
         );
 
-        self.texture.update(&self.queue, self.gui.slider);
+        use easer::functions::{Easing, Sine};
+        let slider = Sine::ease_in_out(self.gui.slider, 0.0, 1.0, 1.0);
+        self.texture.update(&self.queue, slider);
     }
 
     pub fn render(&mut self, egui_input: egui::RawInput) -> Result<(), wgpu::SurfaceError> {

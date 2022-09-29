@@ -6,9 +6,10 @@ struct VertexOutput {
 
 struct Rotation {
     transform: mat4x4<f32>,
+    jitter: vec4<f32>,
 };
 @group(0) @binding(0)
-var<uniform> rotation: Rotation;
+var<uniform> r: Rotation;
 
 struct Camera {
     view_position: vec4<f32>,
@@ -33,7 +34,6 @@ fn vs_background(
         vec3<f32>(-10.0, -10.0, -10.0),
         vec3<f32>(10.0, -10.0, -10.0),
     );
-
     var colors = array<vec4<f32>, 6>(
         vec4<f32>(1.0, 1.0, 0.0, 0.75),
         vec4<f32>(0.0, 1.0, 1.0, 0.75),
@@ -43,7 +43,6 @@ fn vs_background(
         vec4<f32>(0.0, 1.0, 1.0, 0.75),
         vec4<f32>(0.5, 0.5, 0.5, 0.75),
     );
-
     var coords = array<vec2<f32>, 6>(
         vec2<f32>(0.0, 1.0),
         vec2<f32>(0.0, 0.0),
@@ -52,25 +51,16 @@ fn vs_background(
         vec2<f32>(0.0, 0.0),
         vec2<f32>(0.0, 1.0),
     );
-    /*
-    var colors = array<vec4<f32>, 6>(
-        vec4<f32>(0.0, 0.0, 0.0, 1.0),
-        vec4<f32>(0.0, 0.0, 0.0, 1.0),
-        vec4<f32>(0.0, 0.0, 0.0, 1.0),
-
-        vec4<f32>(0.0, 0.0, 0.0, 1.0),
-        vec4<f32>(0.0, 0.0, 0.0, 1.0),
-        vec4<f32>(0.0, 0.0, 0.0, 1.0),
-    );
-    */
-
     let v = vertices[in_vertex_index];
-
     var out: VertexOutput;
+
     out.clip_position =
-        camera.view_proj * vec4<f32>(v, 1.0) + vec4<f32>(4.0, 0.0, 0.0, 0.0);
+        camera.view_proj *
+        vec4<f32>(v, 1.0) +
+        vec4<f32>(4.0 + r.jitter.x * 0.2, r.jitter.y * 0.08, 0.0, 0.0);
     out.color = colors[in_vertex_index];
     out.tex_coords = coords[in_vertex_index];
+
     return out;
 }
 
@@ -110,7 +100,7 @@ fn vs_pyramid(
 
     var out: VertexOutput;
     out.clip_position =
-        camera.view_proj * rotation.transform * vec4<f32>(v, 1.0) + vec4<f32>(4.0, 0.0, 0.0, 0.0);
+        camera.view_proj * r.transform * vec4<f32>(v, 1.0) + vec4<f32>(4.0, 0.0, 0.0, 0.0);
     out.color = colors[in_vertex_index];
     out.tex_coords = vec2<f32>(0.0, 0.0);
     return out;
@@ -160,7 +150,7 @@ fn vs_pyramid4(
 
     var out: VertexOutput;
     out.clip_position =
-        camera.view_proj * rotation.transform * vec4<f32>(v, 1.0) + vec4<f32>(-4.0, 0.0, 0.0, 0.0);
+        camera.view_proj * r.transform * vec4<f32>(v, 1.0) + vec4<f32>(-4.0, 0.0, 0.0, 0.0);
     out.color = colors[in_vertex_index];
     out.tex_coords = vec2<f32>(0.0, 0.0);
     return out;
@@ -208,11 +198,11 @@ var t_diffuse: texture_2d<f32>;
 @group(3) @binding(1)
 var s_diffuse: sampler;
 @group(3) @binding(2)
-var<uniform> raw: Raw;
+var<uniform> alpha: Raw;
 
 @fragment
 fn fs_texture(in: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4<f32>(textureSample(t_diffuse, s_diffuse, in.tex_coords).xyz, raw.data.w);
+    return vec4<f32>(textureSample(t_diffuse, s_diffuse, in.tex_coords).xyz, alpha.data.w);
 }
 
 @group(2) @binding(0)

@@ -17,14 +17,28 @@ pub struct Texture {
 }
 
 impl Texture {
-    /// Create a `Texture` from a `image::DynamicImage`.
-    pub fn from_image_file(
+    /// Create a `Texture` from a slice of bytes.
+    pub fn from_bytes(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        filename: &str,
+        bytes: &[u8],
+        label: &str,
+        is_normal_map: bool,
+    ) -> anyhow::Result<Self> {
+        let img = image::load_from_memory(bytes)?;
+        Self::from_image(device, queue, &img, Some(label), is_normal_map)
+    }
+
+    /// Create a `Texture` from a `image::DynamicImage`.
+    pub fn from_image(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        img: &image::DynamicImage,
         label: Option<&str>,
         is_normal_map: bool,
     ) -> anyhow::Result<Self> {
+
+        /*
         //img: &image::DynamicImage,
         let path = std::path::Path::new(env!("OUT_DIR"))
             .join("res")
@@ -32,6 +46,7 @@ impl Texture {
         //println!("PATH:>{path:?}<");
         let data = std::fs::read(path)?;
         let img = image::load_from_memory(&data)?;
+        */
 
         let rgba = img.to_rgba8();
         let dimensions = img.dimensions();

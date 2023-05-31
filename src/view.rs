@@ -51,11 +51,14 @@ impl RenderView {
     pub async fn new(window: &Window) -> Self {
         let size = window.inner_size();
         let scale_factor = window.scale_factor() as f32;
-        let instance = wgpu::Instance::new(wgpu::Backends::all());
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::all(),
+            ..wgpu::InstanceDescriptor::default()
+        });
 
         // SAFETY: `View` is created in the main thread and `window` remains valid
         // for the lifetime of `surface`.
-        let surface = unsafe { instance.create_surface(window) };
+        let surface = unsafe { instance.create_surface(window).unwrap() };
 
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -82,12 +85,15 @@ impl RenderView {
             )
             .await
             .unwrap();
+        let capabilities = surface.get_capabilities(&adapter);
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface.get_supported_formats(&adapter)[0],
+            format: capabilities.formats[0],
             width: size.width,
             height: size.height,
             present_mode: wgpu::PresentMode::Fifo,
+            alpha_mode: capabilities.alpha_modes[0],
+            view_formats: vec![capabilities.formats[0]],
         };
         surface.configure(&device, &config);
         let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
@@ -149,7 +155,7 @@ impl RenderView {
         });
 
         let egui_context = egui::Context::default();
-        let egui_renderer = egui_wgpu::Renderer::new(&device, config.format, 1, 0);
+        let egui_renderer = egui_wgpu::Renderer::new(&device, config.format, None, 1);
 
         //let noise = simdnoise::NoiseBuilder::fbm_1d(256).generate_scaled(0.0, 1.0);
 
@@ -208,8 +214,7 @@ impl RenderView {
         let step = dt.as_secs_f32();
 
         if self.keys.rotation {
-            self.rotation
-                .increment_angle(&self.queue, step);
+            self.rotation.increment_angle(&self.queue, step);
         }
         self.camera_controller.update_camera(&mut self.camera, dt);
         self.camera.update_view_proj(&self.projection);
@@ -248,12 +253,6 @@ impl RenderView {
                 depth_stencil_attachment: None,
             });
 
-
-
-
-
-
-
             render_pass.set_bind_group(0, &self.rotation.bind_group, &[]);
             render_pass.set_bind_group(1, &self.camera.bind_group, &[]);
             render_pass.set_bind_group(2, &self.skybox.bind_group, &[]);
@@ -261,37 +260,27 @@ impl RenderView {
             render_pass.set_pipeline(&self.skybox_pipeline);
             render_pass.draw(0..3, 0..1);
 
-
-
-
-
             drop(render_pass);
-        for shape in self.draw_shapes.iter_mut() {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: None,
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load, // Clear(wgpu::Color::default()),
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
-            });
-            render_pass.set_bind_group(0, &self.rotation.bind_group, &[]);
-            render_pass.set_bind_group(1, &self.camera.bind_group, &[]);
-            render_pass.set_bind_group(2, &self.skybox.bind_group, &[]);
-            render_pass.set_bind_group(3, &self.texture.bind_group, &[]);
-            render_pass.set_pipeline(&shape.pipeline);
-            render_pass.draw(0..shape.shape.vertex_count, 0..1);
-        }
-
-
-
-
-
-
+            for shape in self.draw_shapes.iter_mut() {
+                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: None,
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load, // Clear(wgpu::Color::default()),
+                            store: true,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                });
+                render_pass.set_bind_group(0, &self.rotation.bind_group, &[]);
+                render_pass.set_bind_group(1, &self.camera.bind_group, &[]);
+                render_pass.set_bind_group(2, &self.skybox.bind_group, &[]);
+                render_pass.set_bind_group(3, &self.texture.bind_group, &[]);
+                render_pass.set_pipeline(&shape.pipeline);
+                render_pass.draw(0..shape.shape.vertex_count, 0..1);
+            }
         }
 
         /*
@@ -346,6 +335,7 @@ impl RenderView {
         self.egui_renderer.update_buffers(
             &self.device,
             &self.queue,
+            &mut encoder,
             clipped_primitives.as_slice(),
             &screen_descriptor,
         );
@@ -364,7 +354,7 @@ impl RenderView {
                 depth_stencil_attachment: None,
             });
 
-            self.egui_renderer.render_onto_renderpass(
+            self.egui_renderer.render(
                 &mut render_pass,
                 clipped_primitives.as_slice(),
                 &screen_descriptor,

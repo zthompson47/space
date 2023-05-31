@@ -1,7 +1,7 @@
 use cgmath::SquareMatrix;
 use wgpu::util::DeviceExt;
 
-use noise::{Ease, PNoise1};
+use noize::{Ease, PNoise1};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]

@@ -247,14 +247,25 @@ impl RenderView {
                 })],
                 depth_stencil_attachment: None,
             });
+
+
+
+
+
+
+
             render_pass.set_bind_group(0, &self.rotation.bind_group, &[]);
             render_pass.set_bind_group(1, &self.camera.bind_group, &[]);
             render_pass.set_bind_group(2, &self.skybox.bind_group, &[]);
             render_pass.set_bind_group(3, &self.texture.bind_group, &[]);
             render_pass.set_pipeline(&self.skybox_pipeline);
             render_pass.draw(0..3, 0..1);
-        }
 
+
+
+
+
+            drop(render_pass);
         for shape in self.draw_shapes.iter_mut() {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
@@ -275,6 +286,36 @@ impl RenderView {
             render_pass.set_pipeline(&shape.pipeline);
             render_pass.draw(0..shape.shape.vertex_count, 0..1);
         }
+
+
+
+
+
+
+        }
+
+        /*
+        for shape in self.draw_shapes.iter_mut() {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: None,
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load, // Clear(wgpu::Color::default()),
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: None,
+            });
+            render_pass.set_bind_group(0, &self.rotation.bind_group, &[]);
+            render_pass.set_bind_group(1, &self.camera.bind_group, &[]);
+            render_pass.set_bind_group(2, &self.skybox.bind_group, &[]);
+            render_pass.set_bind_group(3, &self.texture.bind_group, &[]);
+            render_pass.set_pipeline(&shape.pipeline);
+            render_pass.draw(0..shape.shape.vertex_count, 0..1);
+        }
+        */
 
         // Egui
         let full_output = self.egui_context.run(egui_input, |ctx| {

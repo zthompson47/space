@@ -57,7 +57,7 @@ fn vs_background(
     out.clip_position =
         camera.view_proj *
         vec4<f32>(v, 1.0) +
-        vec4<f32>(4.0 + r.jitter.x * 0.2, r.jitter.y * 0.08, 0.0, 0.0);
+        vec4<f32>(4.0 + r.jitter.x * 0.2, r.jitter.y * 0.15, 0.0, 0.0);
     out.color = colors[in_vertex_index];
     out.tex_coords = coords[in_vertex_index];
 
